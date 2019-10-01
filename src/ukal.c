@@ -126,7 +126,7 @@ FilterError_t ukal_filter_create(Filter_t * const filter,
     if (gamma->n_rows != n_states) {
         return filter_invalid_argument;
     }
-    ret_iferr( ulapack_init(&filter->gammaQgammaT, gamma->n_cols, gamma->n_cols) );
+    ret_iferr( ulapack_init(&filter->gammaQgammaT, gamma->n_rows, gamma->n_rows) );
 
     /*
      * Initialize the covariance matrix to N x N.
@@ -165,7 +165,7 @@ FilterError_t ukal_filter_create(Filter_t * const filter,
      * Initialize the identity matrix to N x N, and set it to I_{NxN}.
      */
     ret_iferr( ulapack_init(&filter->eye, n_states, n_states) );
-    ret_iferr( ulapack_eye(&filter->eye) );
+    ret_iferr( ulapack_eye(filter->eye) );
 
     /*
      * Set the internal terms to the given terms. Additionally set the transpose
@@ -246,7 +246,7 @@ FilterError_t ukal_set_fx(Filter_t * const filter,
     /*
      * Set the internal term to the given term.
      */
-    ret_iferr( ulapack_copy(fx, &filter->fx) );
+    ret_iferr( ulapack_copy(fx, filter->fx) );
     
     return filter_success; 
 }
@@ -287,7 +287,7 @@ FilterError_t ukal_set_hx(Filter_t * const filter,
     /*
      * Set the internal term to the given term.
      */
-    ret_iferr( ulapack_copy(hx, &filter->Hx) );
+    ret_iferr( ulapack_copy(hx, filter->Hx) );
     
     return filter_success; 
 }
@@ -308,8 +308,8 @@ FilterError_t ukal_set_phi(Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
-    ret_iferr( ulapack_transpose(Phi, &filter->PhiT) );
-    ret_iferr( ulapack_copy(Phi, &filter->Phi) );   
+    ret_iferr( ulapack_transpose(Phi, filter->PhiT) );
+    ret_iferr( ulapack_copy(Phi, filter->Phi) );
 
     return filter_success;
 }
@@ -330,7 +330,7 @@ FilterError_t ukal_set_state(Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
-    ret_iferr( ulapack_copy(x, &filter->x) );
+    ret_iferr( ulapack_copy(x, filter->x) );
 
     return filter_success;
 }
@@ -346,8 +346,10 @@ FilterError_t ukal_set_process_noise(Filter_t * const filter,
      * Temporary variables for matrix product to calculate the constant
      * term: gamma*Q*gamma^T.
      */
-    Matrix_t gammaQ;
-    Matrix_t gammaT;
+    Matrix_t* gammaQ = NULL;
+    ulapack_init(&gammaQ, gamma->n_rows, Q->n_cols);
+    Matrix_t* gammaT = NULL;
+    ulapack_init(&gammaT, gamma->n_cols, gamma->n_rows);
 
     /*
      * Check for illegal dimensions.
@@ -364,17 +366,22 @@ FilterError_t ukal_set_process_noise(Filter_t * const filter,
     /*
      * Calculate gamma^T.
      */
-    ret_iferr( ulapack_transpose(gamma, &gammaT) );
+    ret_iferr( ulapack_transpose(gamma, gammaT) );
     /*
      * Calculate gamma * Q.
      */
-    ret_iferr( ulapack_product(gamma, Q, &gammaQ) );
-
+    ret_iferr( ulapack_product(gamma, Q, gammaQ) );
+    ulapack_print(gammaQ, stdout);
+    ulapack_print(gammaT, stdout);
     /*
      * Calculate and internally store the constant term:
      * gamma * Q * gamma^T.
      */
-    ret_iferr( ulapack_product(&gammaQ, &gammaT, &filter->gammaQgammaT) );
+    // gammaQgammaT should be n_cols x n_cols
+    ret_iferr( ulapack_product(gammaQ, gammaT, filter->gammaQgammaT) );
+
+    ulapack_destroy(gammaQ);
+    ulapack_destroy(gammaT);
 
     return filter_success;
 }
@@ -395,7 +402,7 @@ FilterError_t ukal_set_state_cov(Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
-    ret_iferr( ulapack_copy(P, &filter->P) );
+    ret_iferr( ulapack_copy(P, filter->P) );
 
     return filter_success;
 }
@@ -416,8 +423,8 @@ FilterError_t ukal_set_obs(Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
-    ret_iferr( ulapack_transpose(H, &filter->HT) );
-    ret_iferr( ulapack_copy(H, &filter->H) );   
+    ret_iferr( ulapack_transpose(H, filter->HT) );
+    ret_iferr( ulapack_copy(H, filter->H) );
 
     return filter_success;
 }
@@ -438,7 +445,7 @@ FilterError_t ukal_set_obs_noise(Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
-    ret_iferr( ulapack_copy(R, &filter->R) );   
+    ret_iferr( ulapack_copy(R, filter->R) );
 
     return filter_success;
 }
@@ -459,7 +466,7 @@ FilterError_t ukal_get_state_cov(const Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
-    ret_iferr( ulapack_copy(&filter->P, P) );
+    ret_iferr( ulapack_copy(filter->P, P) );
 
     return filter_success;
 }
@@ -480,7 +487,7 @@ FilterError_t ukal_get_state(const Filter_t * const filter,
     /*
      * Copy back the term requested.
      */
-    ret_iferr( ulapack_copy(&filter->x, x) );
+    ret_iferr( ulapack_copy(filter->x, x) );
 
     return filter_success;
 }
@@ -491,31 +498,30 @@ FilterError_t ukal_model_predict(Filter_t * const filter) {
     /*
      * Temporary variable for Phi * x calculation.
      */
-    Matrix_t Phix;
+    Matrix_t* Phix = NULL;
 
     /*
      * Temporary variables for Phi * P * Phi^T calculation.
      */
-    Matrix_t PhiP;
-    Matrix_t PhiPPhiT;
-    
+    Matrix_t* PhiP = NULL;
+    Matrix_t* PhiPPhiT = NULL;
     ret_iferr( ulapack_init(&PhiP, filter->n_states, filter->n_states) );
     ret_iferr( ulapack_init(&PhiPPhiT, filter->n_states, filter->n_states) );
 
     /*
      * Calculate Phi * P.
      */
-    ret_iferr( ulapack_product(&filter->Phi, &filter->P, &PhiP) );
+    ret_iferr( ulapack_product(filter->Phi, filter->P, PhiP) );
 
     /*
      * Calculate Phi * P * Phi^T.
      */
-    ret_iferr( ulapack_product(&PhiP, &filter->PhiT, &PhiPPhiT) );
+    ret_iferr( ulapack_product(PhiP, filter->PhiT, PhiPPhiT) );
 
     /*
      * Calculate and store Phi*P*Phi^T + gamma*Q*gamma^T.
      */
-    ret_iferr( ulapack_add(&PhiPPhiT, &filter->gammaQgammaT, &filter->P) );
+    ret_iferr( ulapack_add(PhiPPhiT, filter->gammaQgammaT, filter->P) );
 
     switch(filter->type) {
         case linear:
@@ -527,19 +533,19 @@ FilterError_t ukal_model_predict(Filter_t * const filter) {
             /*
              * Compute the total covariance matrix.
              */
-            ret_iferr( ulapack_product(&filter->Phi, &filter->x, &Phix) );
+            ret_iferr( ulapack_product(filter->Phi, filter->x, Phix) );
 
             /*
              * Copy Phi * x into the internal state vector for the predicted 
              * state.
              */
-            ret_iferr( ulapack_copy(&Phix, &filter->x) );
+            ret_iferr( ulapack_copy(Phix, filter->x) );
 
             break;
 
         case ekf:
         case sof:
-            ret_iferr( ulapack_copy(&filter->fx, &filter->x) );
+            ret_iferr( ulapack_copy(filter->fx, filter->x) );
 
             break;
 
@@ -549,6 +555,10 @@ FilterError_t ukal_model_predict(Filter_t * const filter) {
              */
             return filter_error;
     }
+
+    ulapack_destroy(Phix);
+    ulapack_destroy(PhiP);
+    ulapack_destroy(PhiPPhiT);
 
     return filter_success;
 }
@@ -568,10 +578,10 @@ static FilterError_t _ukal_update_kalman_gain(Filter_t * const filter) {
     /*
      * Declare temporary variables for Kalman gain calculation.
      */
-    Matrix_t PHT; /* P_{k+1}(-) * H_{k+1}^T */
-    Matrix_t HPHT; /* H_{k+1} * P_{k+1}(-) * H_{k+1}^T */
-    Matrix_t HPHTpR; /* H_{k+1} * P_{k+1}(-) * H_{k+1}^T + R_{k+1} */
-    Matrix_t HPHTpR_inv; /* (H_{k+1} * P_{k+1}(-) * H_{k+1}^T + R_{k+1})^-1 */
+    Matrix_t* PHT = NULL; /* P_{k+1}(-) * H_{k+1}^T */
+    Matrix_t* HPHT = NULL; /* H_{k+1} * P_{k+1}(-) * H_{k+1}^T */
+    Matrix_t* HPHTpR = NULL; /* H_{k+1} * P_{k+1}(-) * H_{k+1}^T + R_{k+1} */
+    Matrix_t* HPHTpR_inv = NULL; /* (H_{k+1} * P_{k+1}(-) * H_{k+1}^T + R_{k+1})^-1 */
 
     ret_iferr( ulapack_init(&PHT, filter->n_states, filter->n_measurements) );
     ret_iferr( ulapack_init(&HPHT, filter->n_measurements, filter->n_measurements) );
@@ -581,27 +591,32 @@ static FilterError_t _ukal_update_kalman_gain(Filter_t * const filter) {
     /*
      * Compute P_{k+1}(-) * H_{k+1}^T.
      */
-    ret_iferr( ulapack_product(&filter->P, &filter->HT, &PHT) );
+    ret_iferr( ulapack_product(filter->P, filter->HT, PHT) );
     /*
      * Compute H_{k+1} * P_{k+1}(-) * H_{k+1}^T.
      */
-    ret_iferr( ulapack_product(&filter->H, &PHT, &HPHT) );
+    ret_iferr( ulapack_product(filter->H, PHT, HPHT) );
 
     /*
      * Compute H_{k+1} * P_{k+1}(-) * H_{k+1}^T + R_{k+1}.
      */
-    ret_iferr( ulapack_add(&HPHT, &filter->R, &HPHTpR) );
+    ret_iferr( ulapack_add(HPHT, filter->R, HPHTpR) );
 
     /*
      * Compute inv(H_{k+1} * P_{k+1}(-) * H_{k+1}^T + R_{k+1}).
      */
-    ret_iferr( ulapack_inverse(&HPHTpR, &HPHTpR_inv) );
+    ret_iferr( ulapack_inverse(HPHTpR, HPHTpR_inv) );
 
     /*
      * Compute the remainder of the Kalman gain matrix, and store it.
      */
-    ret_iferr( ulapack_set(&filter->K, 0.0) );
-    ret_iferr( ulapack_product(&PHT, &HPHTpR_inv, &filter->K) );
+    ret_iferr( ulapack_set(filter->K, 0.0) );
+    ret_iferr( ulapack_product(PHT, HPHTpR_inv, filter->K) );
+
+    ulapack_destroy(PHT);
+    ulapack_destroy(HPHT);
+    ulapack_destroy(HPHTpR);
+    ulapack_destroy(HPHTpR_inv);
 
     return filter_success;
 }
@@ -622,25 +637,27 @@ static FilterError_t _ukal_update_state_vector(Filter_t * const filter,
     /*
      * Temporary variable for the weighed innovation term.
      */
-    Matrix_t Kinn;
+    Matrix_t* Kinn = NULL;
 
     /*
      * Compute the innovation term: (y - Hx) or (y - h(x)).
      * Assume H*x or h(x) is known before this point.
      */
-    ret_iferr( ulapack_subtract(y, &filter->Hx, &filter->innovation) );
+    ret_iferr( ulapack_subtract(y, filter->Hx, filter->innovation) );
 
     /*
      * Weigh the measured and predicted observations via the Kalman gain matrix.
      * It is assumed that the gain matrix is known at this point.
      */
     ret_iferr( ulapack_init(&Kinn, filter->n_states, 1) );
-    ret_iferr( ulapack_product(&filter->K, &filter->innovation, &Kinn) );
+    ret_iferr( ulapack_product(filter->K, filter->innovation, Kinn) );
 
     /*
      * Add the predicted state vector to the weighted innovation.
      */
-    ret_iferr( ulapack_add(&filter->x, &Kinn, &filter->x) );
+    ret_iferr( ulapack_add(filter->x, Kinn, filter->x) );
+
+    ulapack_destroy(Kinn);
 
     return filter_success;
 }
@@ -659,12 +676,12 @@ static FilterError_t _ukal_update_cov(Filter_t * const filter) {
     /*
      * Temporary variable for K*H and (I - KH) * P.
      */
-    Matrix_t temp;
+    Matrix_t* temp = NULL;
 
     /*
      * Temporary variable for I - KH.
      */
-    Matrix_t ImKH;
+    Matrix_t* ImKH = NULL;
 
     /*
      * Initialize dimensions of temporary objects.
@@ -675,23 +692,26 @@ static FilterError_t _ukal_update_cov(Filter_t * const filter) {
     /*
      * Compute K*H.
      */
-    ret_iferr( ulapack_product(&filter->K, &filter->H, &temp) );
+    ret_iferr( ulapack_product(filter->K, filter->H, temp) );
 
     /*
      * Compute I - K*H.
      */
-    ret_iferr( ulapack_subtract(&filter->eye, &temp, &ImKH) );
+    ret_iferr( ulapack_subtract(filter->eye, temp, ImKH) );
 
     /*
      * Calculate the covariance matrix.
      */
-    ulapack_set(&temp, 0.0);
-    ret_iferr( ulapack_product(&ImKH, &filter->P, &temp) );
+    ulapack_set(temp, 0.0);
+    ret_iferr( ulapack_product(ImKH, filter->P, temp) );
 
     /*
      * Store the result in the internal filter.
      */
-    ret_iferr( ulapack_copy(&temp, &filter->P) );
+    ret_iferr( ulapack_copy(temp, filter->P) );
+
+    ulapack_destroy(temp);
+    ulapack_destroy(ImKH);
 
     return filter_success;
 }
@@ -712,7 +732,7 @@ FilterError_t ukal_update(Filter_t * const filter,
      * is assumed to be calculated before a call to this function.
      */
     if (filter->type == linear) {
-        ret_iferr( ulapack_product(&filter->Hx, &filter->H, &filter->x) );
+        ret_iferr( ulapack_product(filter->Hx, filter->H, filter->x) );
     }
 
     /*

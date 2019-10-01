@@ -44,28 +44,28 @@ typedef struct {
 
     FilterType_t type; /** < Stores the filter type. */
 
-    Matrix_t P; /** < The covariance matrix. */
-    Matrix_t K; /** < The Kalman gain matrix. */
-    Matrix_t eye; /** < Identity matrix for this filter. */
+    Matrix_t* P; /** < The covariance matrix. */
+    Matrix_t* K; /** < The Kalman gain matrix. */
+    Matrix_t* eye; /** < Identity matrix for this filter. */
 
     /*
      * The model equation terms. 
      */
-    Matrix_t x; /** < The state vector. */
-    Matrix_t fx; /** < The nonlinear Jacobian result for f(x). */
-    Matrix_t Phi; /** < The propagation matrix. */
-    Matrix_t PhiT; /** < The propagation matrix transposed. */
-    Matrix_t gammaQgammaT; /** < The product of the process noise vector,
+    Matrix_t* x; /** < The state vector. */
+    Matrix_t* fx; /** < The nonlinear Jacobian result for f(x). */
+    Matrix_t* Phi; /** < The propagation matrix. */
+    Matrix_t* PhiT; /** < The propagation matrix transposed. */
+    Matrix_t* gammaQgammaT; /** < The product of the process noise vector,
                                  the process noise covariance matrix, and
                                  the transpose of the process noise. */
     /*
      * Measurement model.
      */
-    Matrix_t H; /** < The measurement model matrix. */
-    Matrix_t Hx; /** < The calculation place holder for H*x or h(x). */
-    Matrix_t HT; /** < The transpose of the measurement model matrix. */
-    Matrix_t innovation; /** < The innovation term: (y - Hx) or (y - h(x)). */
-    Matrix_t R; /** < The sensor noise covariance. */
+    Matrix_t* H; /** < The measurement model matrix. */
+    Matrix_t* Hx; /** < The calculation place holder for H*x or h(x). */
+    Matrix_t* HT; /** < The transpose of the measurement model matrix. */
+    Matrix_t* innovation; /** < The innovation term: (y - Hx) or (y - h(x)). */
+    Matrix_t* R; /** < The sensor noise covariance. */
     /*@}*/
 } Filter_t;
 
