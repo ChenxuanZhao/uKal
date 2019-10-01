@@ -255,7 +255,6 @@ void ukal_ekal_thread_entry(void* parameters) {
     ulapack_init(&Hx, n_measurements, 1);
     get_obs_jacobian(Hx, x);
 
-    printf("n_states: %d, n_measurements:%d\n", n_states, n_measurements);
     ut_iserr(ukal_filter_create(&filter, ekf, n_states, n_measurements,
                        Phi, gamma, x, Q,
                        P,
