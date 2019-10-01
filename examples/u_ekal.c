@@ -372,7 +372,7 @@ void ukal_ekal_thread_entry(void* parameters) {
 
     end = clock();
     cpu_time_used = ((float) (end - start)) / CLOCKS_PER_SEC;
-    printf("[ulapack] Total speed was %f ms\n", cpu_time_used * 1000);
+    printf("\n[ukal] Total speed was %f ms\n", cpu_time_used * 1000);
 
     if (ut_error_counter > 0) {
         return;
