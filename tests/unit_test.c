@@ -1,6 +1,5 @@
 #include "ulapack.h"
 #include "ukal.h"
-
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -134,11 +133,26 @@ static void get_obs_jacobian(Matrix_t * const Hx,
     ulapack_edit_entry(Hx, 1, 0, x->entry[1][0]);
 }
 
-int main(void) {
+int main() {
     /*
      * Filter object.
      */
     Filter_t filter;
+    filter.P = NULL;
+    filter.K = NULL;
+    filter.eye = NULL;
+
+    filter.x = NULL;
+    filter.fx = NULL;
+    filter.Phi = NULL;
+    filter.PhiT = NULL;
+    filter.gammaQgammaT = NULL;
+
+    filter.H = NULL;
+    filter.Hx = NULL;
+    filter.HT = NULL;
+    filter.innovation = NULL;
+    filter.R = NULL;
 
     const Index_t n_states = 4;
     const Index_t n_measurements = 2;
@@ -156,171 +170,200 @@ int main(void) {
     /*
      * Measurement vector.
      */
-    Matrix_t y;
+    Matrix_t* y = NULL;
     ulapack_init(&y, n_measurements, 1);
-    get_sensor_data(&y); get_sensor_data(&y);
+    get_sensor_data(y); get_sensor_data(y);
 
     /*
      * State vector.
      */
-    Matrix_t x;
+    Matrix_t* x = NULL;
     ulapack_init(&x, n_states, 1);
-    ulapack_edit_entry(&x, 0, 0, y.entry[0][0]);
-    ulapack_edit_entry(&x, 1, 0, y.entry[1][0]);
-    ulapack_edit_entry(&x, 2, 0, 5.6865);
-    ulapack_edit_entry(&x, 3, 0, 3.1416);
+    ulapack_edit_entry(x, 0, 0, y->entry[0][0]);
+    ulapack_edit_entry(x, 1, 0, y->entry[1][0]);
+    ulapack_edit_entry(x, 2, 0, 5.6865);
+    ulapack_edit_entry(x, 3, 0, 3.1416);
 
     /*
      * The state propagation matrix.
      */
-    Matrix_t Phi;
+    Matrix_t* Phi = NULL;
     ulapack_init(&Phi, n_states, n_states);
-    get_state_jacobian(&Phi, &x, dt);
+    get_state_jacobian(Phi, x, dt);
 
     /*
      * The state process noise.
      */
-    Matrix_t gamma;
+    Matrix_t* gamma = NULL;
     ulapack_init(&gamma, n_states, 2);
-    ulapack_set(&gamma, 0.0);
-    ulapack_edit_entry(&gamma, 2, 0, 1.0);
-    ulapack_edit_entry(&gamma, 3, 1, 1.0);
+    ulapack_set(gamma, 0.0);
+    ulapack_edit_entry(gamma, 2, 0, 1.0);
+    ulapack_edit_entry(gamma, 3, 1, 1.0);
 
     /*
      * The state process noise covariance matrix.
      */
-    Matrix_t Q;
-    ulapack_init(&Q, gamma.n_cols, gamma.n_cols);
-    ulapack_set(&Q, 0.0);
-    ulapack_edit_entry(&Q, 0, 0, 5*5*dt);
-    ulapack_edit_entry(&Q, 1, 1, .5*.5*dt);
+    Matrix_t* Q = NULL;
+    ulapack_init(&Q, gamma->n_cols, gamma->n_cols);
+    ulapack_set(Q, 0.0);
+    ulapack_edit_entry(Q, 0, 0, 5*5*dt);
+    ulapack_edit_entry(Q, 1, 1, .5*.5*dt);
 
     /*
      * The state covariance matrix.
      */
-    Matrix_t P;
+    Matrix_t* P = NULL;
     ulapack_init(&P, n_states, n_states);
-    ulapack_edit_entry(&P, 0, 0, varx);
-    ulapack_edit_entry(&P, 1, 1, vary);
-    ulapack_edit_entry(&P, 2, 2, varv);
-    ulapack_edit_entry(&P, 3, 3, vartheta);
+    ulapack_edit_entry(P, 0, 0, varx);
+    ulapack_edit_entry(P, 1, 1, vary);
+    ulapack_edit_entry(P, 2, 2, varv);
+    ulapack_edit_entry(P, 3, 3, vartheta);
 
-    ulapack_edit_entry(&P, 0, 2, 2*varx / (dt * dt));
-    ulapack_edit_entry(&P, 2, 0, 2*varx / (dt * dt));
-    ulapack_edit_entry(&P, 1, 2, 2*varx / (dt * dt));
-    ulapack_edit_entry(&P, 2, 1, 2*varx / (dt * dt));
+    ulapack_edit_entry(P, 0, 2, 2*varx / (dt * dt));
+    ulapack_edit_entry(P, 2, 0, 2*varx / (dt * dt));
+    ulapack_edit_entry(P, 1, 2, 2*varx / (dt * dt));
+    ulapack_edit_entry(P, 2, 1, 2*varx / (dt * dt));
 
-    ulapack_edit_entry(&P, 0, 3, 2*varx);
-    ulapack_edit_entry(&P, 3, 0, 2*varx);
-    ulapack_edit_entry(&P, 1, 3, 2*varx);
-    ulapack_edit_entry(&P, 3, 1, 2*varx);
+    ulapack_edit_entry(P, 0, 3, 2*varx);
+    ulapack_edit_entry(P, 3, 0, 2*varx);
+    ulapack_edit_entry(P, 1, 3, 2*varx);
+    ulapack_edit_entry(P, 3, 1, 2*varx);
 
-    Matrix_t H;
+    Matrix_t* H = NULL;
     ulapack_init(&H, n_measurements, n_states);
-    ulapack_set(&H, 0.0);
-    ulapack_edit_entry(&H, 0, 0, 1.0);
-    ulapack_edit_entry(&H, 1, 1, 1.0);
+    ulapack_set(H, 0.0);
+    ulapack_edit_entry(H, 0, 0, 1.0);
+    ulapack_edit_entry(H, 1, 1, 1.0);
 
-    Matrix_t R;
+    Matrix_t* R = NULL;
     ulapack_init(&R, n_measurements, n_measurements);
-    ulapack_set(&R, 0.0);
-    ulapack_edit_entry(&R, 0, 0, (stdx*stdx) / 3);
-    ulapack_edit_entry(&R, 1, 1, (stdy*stdy) / 3);
+    ulapack_set(R, 0.0);
+    ulapack_edit_entry(R, 0, 0, (stdx*stdx) / 3);
+    ulapack_edit_entry(R, 1, 1, (stdy*stdy) / 3);
 
-    Matrix_t fx;
+    Matrix_t* fx = NULL;
     ulapack_init(&fx, n_states, 1);
-    get_predicted_state(&fx, &x, dt);
+    get_predicted_state(fx, x, dt);
 
-    Matrix_t Hx;
+    Matrix_t* Hx = NULL;
     ulapack_init(&Hx, n_measurements, 1);
-    get_obs_jacobian(&Hx, &x);
+    get_obs_jacobian(Hx, x);
 
+    printf("n_states: %d, n_measurements:%d\n", n_states, n_measurements);
     ut_iserr(ukal_filter_create(&filter, ekf, n_states, n_measurements,
-                       &Phi, &gamma, &x, &Q,
-                       &P,
-                       &H, &R), "Cannot create filter.");
+                       Phi, gamma, x, Q,
+                       P,
+                       H, R), "Cannot create filter.");
+    printf("filter->gammaQgammaT: %ld %ld\n", filter.gammaQgammaT->n_rows, filter.gammaQgammaT->n_cols);
 
     for (Index_t itor = 0; itor < 45 - 2; itor++) {
 
         printf("k = %d\n", (int)itor);
         printf("*************************************\n");
-        get_sensor_data(&y);
+        get_sensor_data(y);
 
-        get_state_jacobian(&Phi, &filter.x, dt);
-        ut_iserr(ukal_set_phi(&filter, &Phi), "Cannot set prop matrix.");
+        get_state_jacobian(Phi, filter.x, dt);
+        ut_iserr(ukal_set_phi(&filter, Phi), "Cannot set prop matrix.");
 
         printf("Phi(-) = \n");
-        ulapack_print(&filter.Phi, stdout);
+        ulapack_print(filter.Phi, stdout);
 
-        get_predicted_state(&fx, &filter.x, dt);
-        ut_iserr(ukal_set_fx(&filter, &fx), "Cannot update f(x).");
+        get_predicted_state(fx, filter.x, dt);
+        ut_iserr(ukal_set_fx(&filter, fx), "Cannot update f(x).");
         printf("f(x) = \n");
-        ulapack_print(&filter.fx, stdout);
+        ulapack_print(filter.fx, stdout);
 
         ut_iserr(ukal_model_predict(&filter), "Cannot predict model.");
         printf("x(-) = \n");
-        ulapack_print(&filter.x, stdout);
+        ulapack_print(filter.x, stdout);
         printf("P(-) = \n");
-        ulapack_print(&filter.P, stdout);
+        ulapack_print(filter.P, stdout);
 
-        get_obs_jacobian(&Hx, &filter.x);
-        ut_iserr(ukal_set_hx(&filter, &Hx), "Cannot set h(x).");
+        get_obs_jacobian(Hx, filter.x);
+        ut_iserr(ukal_set_hx(&filter, Hx), "Cannot set h(x).");
         printf("h(x) = \n");
-        ulapack_print(&filter.Hx, stdout);
+        ulapack_print(filter.Hx, stdout);
 
-        ut_iserr(ukal_update(&filter, &y), "Cannot update filter.");
+        ut_iserr(ukal_update(&filter, y), "Cannot update filter.");
         printf("K = \n");
-        ulapack_print(&filter.K, stdout);
+        ulapack_print(filter.K, stdout);
         printf("P(+) = \n");
-        ulapack_print(&filter.P, stdout);
+        ulapack_print(filter.P, stdout);
         printf("x(+) = \n");
-        ulapack_print(&filter.x, stdout);
+        ulapack_print(filter.x, stdout);
     }
 
-    Matrix_t x_final_exp;
+    Matrix_t* x_final_exp = NULL;
     ulapack_init(&x_final_exp, n_states, 1);
     /*
      * Parallel filter ran in MATLAB.
      */
-    ulapack_edit_entry(&x_final_exp, 0, 0, 32.950418372726212);
-    ulapack_edit_entry(&x_final_exp, 1, 0, 29.514796929099575);
-    ulapack_edit_entry(&x_final_exp, 2, 0, 5.956417779623743);
-    ulapack_edit_entry(&x_final_exp, 3, 0, 0.071855231860152);
+    ulapack_edit_entry(x_final_exp, 0, 0, 32.950418372726212);
+    ulapack_edit_entry(x_final_exp, 1, 0, 29.514796929099575);
+    ulapack_edit_entry(x_final_exp, 2, 0, 5.956417779623743);
+    ulapack_edit_entry(x_final_exp, 3, 0, 0.071855231860152);
 
     MatrixError_t isequal;
 
-    ut_iserr (ulapack_is_equal(&filter.x, &x_final_exp, &isequal), "Cannot compare expected and actual states.");
+    ut_iserr (ulapack_is_equal(filter.x, x_final_exp, &isequal), "Cannot compare expected and actual states.");
     ut_iserr ( isequal, "Expected and actual state vectors do not match." );
 
-    Matrix_t P_final_exp;
+    Matrix_t* P_final_exp = NULL;
     ulapack_init(&P_final_exp, n_states, n_states);
     /*
      * Parallel filter ran in MATLAB.
      */
-    ulapack_edit_entry(&P_final_exp, 0, 0, 0.517846656052970);
-    ulapack_edit_entry(&P_final_exp, 1, 0, 0.005544392784906);
-    ulapack_edit_entry(&P_final_exp, 2, 0, 1.033243899767675);
-    ulapack_edit_entry(&P_final_exp, 3, 0, -0.012176599795471);
+    ulapack_edit_entry(P_final_exp, 0, 0, 0.517846656052970);
+    ulapack_edit_entry(P_final_exp, 1, 0, 0.005544392784906);
+    ulapack_edit_entry(P_final_exp, 2, 0, 1.033243899767675);
+    ulapack_edit_entry(P_final_exp, 3, 0, -0.012176599795471);
 
-    ulapack_edit_entry(&P_final_exp, 0, 1, 0.005544392784906);
-    ulapack_edit_entry(&P_final_exp, 1, 1, 0.457839474152853);
-    ulapack_edit_entry(&P_final_exp, 2, 1, 0.101416749649471);
-    ulapack_edit_entry(&P_final_exp, 3, 1, 0.122649098758324);
+    ulapack_edit_entry(P_final_exp, 0, 1, 0.005544392784906);
+    ulapack_edit_entry(P_final_exp, 1, 1, 0.457839474152853);
+    ulapack_edit_entry(P_final_exp, 2, 1, 0.101416749649471);
+    ulapack_edit_entry(P_final_exp, 3, 1, 0.122649098758324);
 
-    ulapack_edit_entry(&P_final_exp, 0, 2,  1.033243899767674);
-    ulapack_edit_entry(&P_final_exp, 1, 2,  0.101416749649471);
-    ulapack_edit_entry(&P_final_exp, 2, 2, 12.491559373945359);
-    ulapack_edit_entry(&P_final_exp, 3, 2,  0.004225656804946);
+    ulapack_edit_entry(P_final_exp, 0, 2,  1.033243899767674);
+    ulapack_edit_entry(P_final_exp, 1, 2,  0.101416749649471);
+    ulapack_edit_entry(P_final_exp, 2, 2, 12.491559373945359);
+    ulapack_edit_entry(P_final_exp, 3, 2,  0.004225656804946);
 
-    ulapack_edit_entry(&P_final_exp, 0, 3, -0.012176599795471);
-    ulapack_edit_entry(&P_final_exp, 1, 3,  0.122649098758324);
-    ulapack_edit_entry(&P_final_exp, 2, 3,  0.004225656804946);
-    ulapack_edit_entry(&P_final_exp, 3, 3,  0.151279207167239);
+    ulapack_edit_entry(P_final_exp, 0, 3, -0.012176599795471);
+    ulapack_edit_entry(P_final_exp, 1, 3,  0.122649098758324);
+    ulapack_edit_entry(P_final_exp, 2, 3,  0.004225656804946);
+    ulapack_edit_entry(P_final_exp, 3, 3,  0.151279207167239);
 
-    ut_iserr (ulapack_is_equal(&filter.P, &P_final_exp, &isequal), "Cannot compare expected and cov mats.");
+    ut_iserr (ulapack_is_equal(filter.P, P_final_exp, &isequal), "Cannot compare expected and cov mats.");
     ut_iserr ( isequal, "Expected and actual cov matrix do not match." );
         
     printf("Errors: %u\n", ut_error_counter);
+
+    ulapack_destroy(y);
+    ulapack_destroy(x);
+    ulapack_destroy(Phi);
+    ulapack_destroy(gamma);
+    ulapack_destroy(P);
+    ulapack_destroy(H);
+    ulapack_destroy(R);
+    ulapack_destroy(fx);
+    ulapack_destroy(Hx);
+    ulapack_destroy(Q);
+    ulapack_destroy(x_final_exp);
+    ulapack_destroy(P_final_exp);
+
+    ulapack_destroy(filter.P);
+    ulapack_destroy(filter.K);
+    ulapack_destroy(filter.eye);
+    ulapack_destroy(filter.x);
+    ulapack_destroy(filter.fx);
+    ulapack_destroy(filter.Phi);
+    ulapack_destroy(filter.PhiT);
+    ulapack_destroy(filter.gammaQgammaT);
+    ulapack_destroy(filter.H);
+    ulapack_destroy(filter.Hx);
+    ulapack_destroy(filter.HT);
+    ulapack_destroy(filter.innovation);
+    ulapack_destroy(filter.R);
 
     if (ut_error_counter > 0) {
         return -1 * ut_error_counter;
