@@ -9,8 +9,15 @@ cwd     = GetCurrentDir()
 src     = Glob('src/*.c')
 
 # Examples
-if GetDepend('UKAL_USING_EKAL'):
-    src    += Glob('examples/u_ekal.c')
+if GetDepend('ULAPACK_USE_STATIC_ALLOC'):
+
+    if GetDepend('UKAL_USING_EKAL'):
+        src    += Glob('examples/u_ekal_static.c')
+
+elif GetDepend('ULAPACK_USE_DYNAMIC_ALLOC'):
+
+    if GetDepend('UKAL_USING_EKAL'):
+        src    += Glob('examples/u_ekal_dynamic.c')
 
 path    = [cwd + '/']
 path   += [cwd + '/src']

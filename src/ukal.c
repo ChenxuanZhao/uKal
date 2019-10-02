@@ -166,8 +166,11 @@ FilterError_t ukal_filter_create(Filter_t * const filter,
      * Initialize the identity matrix to N x N, and set it to I_{NxN}.
      */
     ret_iferr( ulapack_init(&filter->eye, n_states, n_states) );
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ret_iferr( ulapack_eye(filter->eye) );
-
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    ret_iferr( ulapack_eye(&filter->eye) );
+#endif
     /*
      * Set the internal terms to the given terms. Additionally set the transpose
      * of the terms for calculation efficiency down the road.
@@ -247,7 +250,11 @@ FilterError_t ukal_set_fx(Filter_t * const filter,
     /*
      * Set the internal term to the given term.
      */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ret_iferr( ulapack_copy(fx, filter->fx) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    ret_iferr( ulapack_copy(fx, &filter->fx) );
+#endif
     
     return filter_success; 
 }
@@ -288,7 +295,11 @@ FilterError_t ukal_set_hx(Filter_t * const filter,
     /*
      * Set the internal term to the given term.
      */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ret_iferr( ulapack_copy(hx, filter->Hx) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    ret_iferr( ulapack_copy(hx, &filter->Hx) );
+#endif
     
     return filter_success; 
 }
@@ -309,8 +320,13 @@ FilterError_t ukal_set_phi(Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ret_iferr( ulapack_transpose(Phi, filter->PhiT) );
     ret_iferr( ulapack_copy(Phi, filter->Phi) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    ret_iferr( ulapack_transpose(Phi, &filter->PhiT) );
+    ret_iferr( ulapack_copy(Phi, &filter->Phi) );
+#endif
 
     return filter_success;
 }
@@ -331,7 +347,11 @@ FilterError_t ukal_set_state(Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ret_iferr( ulapack_copy(x, filter->x) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    ret_iferr( ulapack_copy(x, &filter->x) );
+#endif
 
     return filter_success;
 }
@@ -347,10 +367,17 @@ FilterError_t ukal_set_process_noise(Filter_t * const filter,
      * Temporary variables for matrix product to calculate the constant
      * term: gamma*Q*gamma^T.
      */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     Matrix_t* gammaQ = NULL;
     ulapack_init(&gammaQ, gamma->n_rows, Q->n_cols);
     Matrix_t* gammaT = NULL;
     ulapack_init(&gammaT, gamma->n_cols, gamma->n_rows);
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    Matrix_t gammaQ;
+    ulapack_init(&gammaQ, gamma->n_rows, Q->n_cols);
+    Matrix_t gammaT;
+    ulapack_init(&gammaT, gamma->n_cols, gamma->n_rows);
+#endif
 
     /*
      * Check for illegal dimensions.
@@ -364,6 +391,7 @@ FilterError_t ukal_set_process_noise(Filter_t * const filter,
         return filter_invalid_argument;
     }
 
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     /*
      * Calculate gamma^T.
      */
@@ -383,6 +411,24 @@ FilterError_t ukal_set_process_noise(Filter_t * const filter,
 
     ulapack_destroy(gammaQ);
     ulapack_destroy(gammaT);
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    /*
+     * Calculate gamma^T.
+     */
+    ret_iferr( ulapack_transpose(gamma, &gammaT) );
+    /*
+     * Calculate gamma * Q.
+     */
+    ret_iferr( ulapack_product(gamma, Q, &gammaQ) );
+    ulapack_print(&gammaQ, stdout);
+    ulapack_print(&gammaT, stdout);
+    /*
+     * Calculate and internally store the constant term:
+     * gamma * Q * gamma^T.
+     */
+    // gammaQgammaT should be n_cols x n_cols
+    ret_iferr( ulapack_product(&gammaQ, &gammaT, &filter->gammaQgammaT) );
+#endif
 
     return filter_success;
 }
@@ -403,7 +449,11 @@ FilterError_t ukal_set_state_cov(Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ret_iferr( ulapack_copy(P, filter->P) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    ret_iferr( ulapack_copy(P, &filter->P) );
+#endif
 
     return filter_success;
 }
@@ -424,8 +474,13 @@ FilterError_t ukal_set_obs(Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ret_iferr( ulapack_transpose(H, filter->HT) );
     ret_iferr( ulapack_copy(H, filter->H) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    ret_iferr( ulapack_transpose(H, &filter->HT) );
+    ret_iferr( ulapack_copy(H, &filter->H) );
+#endif
 
     return filter_success;
 }
@@ -446,7 +501,11 @@ FilterError_t ukal_set_obs_noise(Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ret_iferr( ulapack_copy(R, filter->R) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    ret_iferr( ulapack_copy(R, &filter->R) );
+#endif
 
     return filter_success;
 }
@@ -467,7 +526,11 @@ FilterError_t ukal_get_state_cov(const Filter_t * const filter,
     /*
      * Set the internal terms to the given terms.
      */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ret_iferr( ulapack_copy(filter->P, P) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    ret_iferr( ulapack_copy(&filter->P, P) );
+#endif
 
     return filter_success;
 }
@@ -488,7 +551,11 @@ FilterError_t ukal_get_state(const Filter_t * const filter,
     /*
      * Copy back the term requested.
      */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ret_iferr( ulapack_copy(filter->x, x) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    ret_iferr( ulapack_copy(&filter->x, x) );
+#endif
 
     return filter_success;
 }
@@ -496,6 +563,7 @@ FilterError_t ukal_get_state(const Filter_t * const filter,
 FilterError_t ukal_model_predict(Filter_t * const filter) {
     error_if_uninit(filter);
 
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     /*
      * Temporary variable for Phi * x calculation.
      */
@@ -523,6 +591,35 @@ FilterError_t ukal_model_predict(Filter_t * const filter) {
      * Calculate and store Phi*P*Phi^T + gamma*Q*gamma^T.
      */
     ret_iferr( ulapack_add(PhiPPhiT, filter->gammaQgammaT, filter->P) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    /*
+     * Temporary variable for Phi * x calculation.
+     */
+    Matrix_t Phix;
+
+    /*
+     * Temporary variables for Phi * P * Phi^T calculation.
+     */
+    Matrix_t PhiP;
+    Matrix_t PhiPPhiT;
+    ret_iferr( ulapack_init(&PhiP, filter->n_states, filter->n_states) );
+    ret_iferr( ulapack_init(&PhiPPhiT, filter->n_states, filter->n_states) );
+
+    /*
+     * Calculate Phi * P.
+     */
+    ret_iferr( ulapack_product(&filter->Phi, &filter->P, &PhiP) );
+
+    /*
+     * Calculate Phi * P * Phi^T.
+     */
+    ret_iferr( ulapack_product(&PhiP, &filter->PhiT, &PhiPPhiT) );
+
+    /*
+     * Calculate and store Phi*P*Phi^T + gamma*Q*gamma^T.
+     */
+    ret_iferr( ulapack_add(&PhiPPhiT, &filter->gammaQgammaT, &filter->P) );
+#endif
 
     switch(filter->type) {
         case linear:
@@ -534,20 +631,30 @@ FilterError_t ukal_model_predict(Filter_t * const filter) {
             /*
              * Compute the total covariance matrix.
              */
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
             ret_iferr( ulapack_product(filter->Phi, filter->x, Phix) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+            ret_iferr( ulapack_product(&filter->Phi, &filter->x, &Phix) );
+#endif
 
             /*
              * Copy Phi * x into the internal state vector for the predicted 
              * state.
              */
-            ret_iferr( ulapack_copy(Phix, filter->x) );
-
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
+		    ret_iferr( ulapack_copy(Phix, filter->x) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+		    ret_iferr( ulapack_copy(&Phix, &filter->x) );
+#endif
             break;
 
         case ekf:
         case sof:
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
             ret_iferr( ulapack_copy(filter->fx, filter->x) );
-
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+            ret_iferr( ulapack_copy(&filter->fx, &filter->x) );
+#endif
             break;
 
         default:
@@ -557,9 +664,11 @@ FilterError_t ukal_model_predict(Filter_t * const filter) {
             return filter_error;
     }
 
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     ulapack_destroy(Phix);
     ulapack_destroy(PhiP);
     ulapack_destroy(PhiPPhiT);
+#endif
 
     return filter_success;
 }
@@ -576,6 +685,7 @@ FilterError_t ukal_model_predict(Filter_t * const filter) {
  * @return Filter status code.
  */
 static FilterError_t _ukal_update_kalman_gain(Filter_t * const filter) {
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     /*
      * Declare temporary variables for Kalman gain calculation.
      */
@@ -618,6 +728,45 @@ static FilterError_t _ukal_update_kalman_gain(Filter_t * const filter) {
     ulapack_destroy(HPHT);
     ulapack_destroy(HPHTpR);
     ulapack_destroy(HPHTpR_inv);
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    /*
+     * Declare temporary variables for Kalman gain calculation.
+     */
+    Matrix_t PHT; /* P_{k+1}(-) * H_{k+1}^T */
+    Matrix_t HPHT; /* H_{k+1} * P_{k+1}(-) * H_{k+1}^T */
+    Matrix_t HPHTpR; /* H_{k+1} * P_{k+1}(-) * H_{k+1}^T + R_{k+1} */
+    Matrix_t HPHTpR_inv; /* (H_{k+1} * P_{k+1}(-) * H_{k+1}^T + R_{k+1})^-1 */
+
+    ret_iferr( ulapack_init(&PHT, filter->n_states, filter->n_measurements) );
+    ret_iferr( ulapack_init(&HPHT, filter->n_measurements, filter->n_measurements) );
+    ret_iferr( ulapack_init(&HPHTpR, filter->n_measurements, filter->n_measurements) );
+    ret_iferr( ulapack_init(&HPHTpR_inv, filter->n_measurements, filter->n_measurements) );
+
+    /*
+     * Compute P_{k+1}(-) * H_{k+1}^T.
+     */
+    ret_iferr( ulapack_product(&filter->P, &filter->HT, &PHT) );
+    /*
+     * Compute H_{k+1} * P_{k+1}(-) * H_{k+1}^T.
+     */
+    ret_iferr( ulapack_product(&filter->H, &PHT, &HPHT) );
+
+    /*
+     * Compute H_{k+1} * P_{k+1}(-) * H_{k+1}^T + R_{k+1}.
+     */
+    ret_iferr( ulapack_add(&HPHT, &filter->R, &HPHTpR) );
+
+    /*
+     * Compute inv(H_{k+1} * P_{k+1}(-) * H_{k+1}^T + R_{k+1}).
+     */
+    ret_iferr( ulapack_inverse(&HPHTpR, &HPHTpR_inv) );
+
+    /*
+     * Compute the remainder of the Kalman gain matrix, and store it.
+     */
+    ret_iferr( ulapack_set(&filter->K, 0.0) );
+    ret_iferr( ulapack_product(&PHT, &HPHTpR_inv, &filter->K) );
+#endif
 
     return filter_success;
 }
@@ -635,6 +784,7 @@ static FilterError_t _ukal_update_kalman_gain(Filter_t * const filter) {
  */
 static FilterError_t _ukal_update_state_vector(Filter_t * const filter,
                                                const Matrix_t * const y) {
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     /*
      * Temporary variable for the weighed innovation term.
      */
@@ -660,6 +810,31 @@ static FilterError_t _ukal_update_state_vector(Filter_t * const filter,
 
     ulapack_destroy(Kinn);
 
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    /*
+     * Temporary variable for the weighed innovation term.
+     */
+    Matrix_t Kinn;
+
+    /*
+     * Compute the innovation term: (y - Hx) or (y - h(x)).
+     * Assume H*x or h(x) is known before this point.
+     */
+    ret_iferr( ulapack_subtract(y, &filter->Hx, &filter->innovation) );
+
+    /*
+     * Weigh the measured and predicted observations via the Kalman gain matrix.
+     * It is assumed that the gain matrix is known at this point.
+     */
+    ret_iferr( ulapack_init(&Kinn, filter->n_states, 1) );
+    ret_iferr( ulapack_product(&filter->K, &filter->innovation, &Kinn) );
+
+    /*
+     * Add the predicted state vector to the weighted innovation.
+     */
+    ret_iferr( ulapack_add(&filter->x, &Kinn, &filter->x) );
+#endif
+
     return filter_success;
 }
 
@@ -674,6 +849,7 @@ static FilterError_t _ukal_update_state_vector(Filter_t * const filter,
  * @return Filter status code.
  */
 static FilterError_t _ukal_update_cov(Filter_t * const filter) {
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
     /*
      * Temporary variable for K*H and (I - KH) * P.
      */
@@ -713,6 +889,44 @@ static FilterError_t _ukal_update_cov(Filter_t * const filter) {
 
     ulapack_destroy(temp);
     ulapack_destroy(ImKH);
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+    /*
+     * Temporary variable for K*H and (I - KH) * P.
+     */
+    Matrix_t temp;
+
+    /*
+     * Temporary variable for I - KH.
+     */
+    Matrix_t ImKH;
+
+    /*
+     * Initialize dimensions of temporary objects.
+     */
+    ret_iferr( ulapack_init(&temp, filter->n_states, filter->n_states) );
+    ret_iferr( ulapack_init(&ImKH, filter->n_states, filter->n_states) );
+
+    /*
+     * Compute K*H.
+     */
+    ret_iferr( ulapack_product(&filter->K, &filter->H, &temp) );
+
+    /*
+     * Compute I - K*H.
+     */
+    ret_iferr( ulapack_subtract(&filter->eye, &temp, &ImKH) );
+
+    /*
+     * Calculate the covariance matrix.
+     */
+    ulapack_set(&temp, 0.0);
+    ret_iferr( ulapack_product(&ImKH, &filter->P, &temp) );
+
+    /*
+     * Store the result in the internal filter.
+     */
+    ret_iferr( ulapack_copy(&temp, &filter->P) );
+#endif
 
     return filter_success;
 }
@@ -733,7 +947,11 @@ FilterError_t ukal_update(Filter_t * const filter,
      * is assumed to be calculated before a call to this function.
      */
     if (filter->type == linear) {
+#if defined(ULAPACK_USE_DYNAMIC_ALLOC)
         ret_iferr( ulapack_product(filter->Hx, filter->H, filter->x) );
+#elif defined(ULAPACK_USE_STATIC_ALLOC)
+        ret_iferr( ulapack_product(&filter->Hx, &filter->H, &filter->x) );
+#endif
     }
 
     /*
