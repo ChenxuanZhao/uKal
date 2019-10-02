@@ -3,7 +3,7 @@
 #include <rtthread.h>
 #include <stdbool.h>
 #include <stdio.h>
-
+#include <time.h>
 #include <math.h>
 
 /*
@@ -135,6 +135,11 @@ static void get_obs_jacobian(Matrix_t * const Hx,
 }
 
 void ukal_ekal_thread_entry(void* parameters) {
+
+    clock_t start, end;
+    float cpu_time_used;
+    start = clock();
+
     /*
      * Filter object.
      */
@@ -322,6 +327,16 @@ void ukal_ekal_thread_entry(void* parameters) {
         
     printf("Errors: %u\n", ut_error_counter);
 
+    end = clock();
+    cpu_time_used = ((float) (end - start)) / CLOCKS_PER_SEC;
+    printf("[ulapack] Total speed was %f ms\n", cpu_time_used * 1000);
+
+    // Uncomment this if you'd like to check memory usage with list_thread
+    while(1)
+    {
+        rt_thread_mdelay(500);
+    }
+
     if (ut_error_counter > 0) {
         return;
     }
@@ -331,7 +346,7 @@ void ukal_ekal_thread_entry(void* parameters) {
 
 static void ukal_ekal_example(int argc, char *argv[])
 {
-    rt_thread_t thread = rt_thread_create("u_ekal", ukal_ekal_thread_entry, RT_NULL, 90112, 25, 10);
+    rt_thread_t thread = rt_thread_create("u_ekal", ukal_ekal_thread_entry, RT_NULL, 122880, 25, 10);
     if(thread != RT_NULL)
     {
         rt_thread_startup(thread);
