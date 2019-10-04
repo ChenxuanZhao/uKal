@@ -24,6 +24,6 @@ path   += [cwd + '/src']
 
 LOCAL_CCFLAGS = ''
 
-group = DefineGroup('ulapack', src, depend = [''], CPPPATH = path, LOCAL_CCFLAGS = LOCAL_CCFLAGS)
+group = DefineGroup('ulapack', src, depend = ['PKG_USING_UKAL'], CPPPATH = path, LOCAL_CCFLAGS = LOCAL_CCFLAGS)
 
 Return('group')
