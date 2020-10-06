@@ -1,4 +1,3 @@
-#include "ulapack.h"
 #include "ukal.h"
 #include <rtthread.h>
 #include <stdbool.h>
@@ -10,6 +9,8 @@
  * Total unit test error counter.
  */
 static unsigned int ut_error_counter = 0;
+
+static rt_mutex_t ukal_dynamic_mutex = RT_NULL;
 
 #define INFO(msg) \
     fprintf(stderr, "Error: %s:%d: ", __FILE__, __LINE__); \
@@ -98,6 +99,7 @@ static Index_t get_sensor_data(Matrix_t * const y) {
     ulapack_edit_entry(y, 1, 0, sensor_data[iteration][1]);
 
     iteration++;
+    iteration %= 45;
     return iteration;
 }
 
@@ -136,6 +138,7 @@ static void get_obs_jacobian(Matrix_t * const Hx,
 
 void ukal_ekal_thread_entry(void* parameters) {
 
+    rt_mutex_take(ukal_dynamic_mutex, RT_WAITING_FOREVER);
     clock_t start, end;
     float cpu_time_used;
     start = clock();
@@ -143,22 +146,7 @@ void ukal_ekal_thread_entry(void* parameters) {
     /*
      * Filter object.
      */
-    Filter_t filter;
-    filter.P = RT_NULL;
-    filter.K = RT_NULL;
-    filter.eye = RT_NULL;
-
-    filter.x = RT_NULL;
-    filter.fx = RT_NULL;
-    filter.Phi = RT_NULL;
-    filter.PhiT = RT_NULL;
-    filter.gammaQgammaT = RT_NULL;
-
-    filter.H = RT_NULL;
-    filter.Hx = RT_NULL;
-    filter.HT = RT_NULL;
-    filter.innovation = RT_NULL;
-    filter.R = RT_NULL;
+    Filter_t filter = { 0 };
 
     const Index_t n_states = 4;
     const Index_t n_measurements = 2;
@@ -372,12 +360,7 @@ void ukal_ekal_thread_entry(void* parameters) {
     end = clock();
     cpu_time_used = ((float) (end - start)) / CLOCKS_PER_SEC;
     printf("\n[ukal] Total speed was %f ms\n", cpu_time_used * 1000);
-
-    if (ut_error_counter > 0) {
-        return;
-    }
-
-    return;
+    rt_mutex_release(ukal_dynamic_mutex);
 }
 
 static void ukal_ekal_example(int argc, char *argv[])
@@ -394,3 +377,16 @@ static void ukal_ekal_example(int argc, char *argv[])
     }
 }
 MSH_CMD_EXPORT(ukal_ekal_example, ulapack extended Kalman filter example);
+
+static int ukal_dynamic_init(void)
+{
+    ukal_dynamic_mutex = rt_mutex_create("ukal_dmutex", RT_IPC_FLAG_FIFO);
+    if (ukal_dynamic_mutex == RT_NULL)
+    {
+        rt_kprintf("[ukal] create dynamic mutex failed.\n");
+        return -RT_ERROR;
+    }
+
+    return RT_EOK;
+}
+INIT_APP_EXPORT(ukal_dynamic_init);

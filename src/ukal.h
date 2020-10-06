@@ -25,6 +25,10 @@
 
 #include "ulapack.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @name ukal_filter_create
  * Create a Kalman filter object with all of the necessary state space system 
@@ -352,4 +356,9 @@ FilterError_t ukal_set_obs_noise(Filter_t * const filter,
 /*
  * End header guard.
  */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
